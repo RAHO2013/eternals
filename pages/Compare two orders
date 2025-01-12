@@ -1,0 +1,139 @@
+import streamlit as st
+import pandas as pd
+import pdfplumber
+from io import BytesIO
+
+def extract_and_merge_tables(file):
+    """Extracts and merges tables from a PDF file if headers are consistent across pages."""
+    merged_table = pd.DataFrame()
+    with pdfplumber.open(file) as pdf:
+        for page in pdf.pages:
+            page_tables = page.extract_tables()
+            for table in page_tables:
+                if table and len(table) > 1:  # Ensure table has valid rows
+                    try:
+                        df = pd.DataFrame(table[1:], columns=table[0])
+                        # Merge with previous tables if headers match
+                        if not merged_table.empty and list(merged_table.columns) == list(df.columns):
+                            merged_table = pd.concat([merged_table, df], ignore_index=True)
+                        else:
+                            merged_table = pd.concat([merged_table, df], ignore_index=True) if merged_table.empty else merged_table
+                    except Exception as e:
+                        st.error(f"Error processing table on page {page.page_number}: {e}")
+    return merged_table
+
+def clean_table(table):
+    """Cleans the extracted table by removing empty rows/columns and standardizing data."""
+    # Drop rows/columns with all None values
+    table = table.dropna(how='all').dropna(axis=1, how='all')
+    # Ensure column names are strings
+    table.columns = table.columns.astype(str)
+    return table
+
+def ensure_unique_columns(df):
+    """Ensure all column names in a DataFrame are unique."""
+    df.columns = pd.io.parsers.ParserBase({'names': df.columns})._maybe_dedup_names(df.columns)
+    return df
+
+def compare_tables(tables1, tables2):
+    """Compares two lists of tables and returns differences."""
+    differences = []
+    max_len = max(len(tables1), len(tables2))
+    
+    for i in range(max_len):
+        if i < len(tables1) and i < len(tables2):
+            table1 = ensure_unique_columns(tables1[i])
+            table2 = ensure_unique_columns(tables2[i])
+            
+            # Align columns, ensuring no duplicates
+            all_columns = pd.Index(set(table1.columns).union(set(table2.columns))).drop_duplicates()
+            table1 = table1.reindex(columns=all_columns, fill_value=pd.NA)
+            table2 = table2.reindex(columns=all_columns, fill_value=pd.NA)
+            
+            if not table1.equals(table2):
+                try:
+                    diff = {
+                        "Table Index": i,
+                        "Differences": table1.compare(table2, align_axis=1)
+                    }
+                    differences.append(diff)
+                except Exception as e:
+                    differences.append({"Table Index": i, "Differences": f"Error comparing tables: {e}"})
+        elif i < len(tables1):
+            differences.append({"Table Index": i, "Differences": "Only in File 1"})
+        elif i < len(tables2):
+            differences.append({"Table Index": i, "Differences": "Only in File 2"})
+
+    return differences
+
+# Streamlit App
+st.title("PDF Table Extraction and Comparison")
+
+# File upload for extraction
+st.subheader("Extract and Merge Tables from PDFs")
+extract_file = st.file_uploader("Upload PDF to Extract and Merge Tables", type=["pdf"])
+
+if extract_file:
+    with st.spinner("Extracting and merging tables from PDF..."):
+        merged_table = extract_and_merge_tables(extract_file)
+
+    if not merged_table.empty:
+        merged_table = clean_table(merged_table)
+        st.success("Tables extracted and merged successfully!")
+        st.subheader("Merged Table")
+        st.dataframe(merged_table)
+    else:
+        st.warning("No valid tables found in the PDF.")
+
+# File upload for comparison
+st.subheader("Compare Tables Between Two PDFs")
+file1 = st.file_uploader("Upload First PDF for Comparison", type=["pdf"], key="file1")
+file2 = st.file_uploader("Upload Second PDF for Comparison", type=["pdf"], key="file2")
+
+if file1 and file2:
+    with st.spinner("Extracting tables from PDFs..."):
+        tables1 = [extract_and_merge_tables(file1)]
+        tables2 = [extract_and_merge_tables(file2)]
+
+    st.success("Tables extracted successfully!")
+
+    # Display tables side by side
+    st.subheader("Side-by-Side Comparison of Merged Tables")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.write("**Merged Table from PDF 1**")
+        if not tables1[0].empty:
+            try:
+                table1 = clean_table(tables1[0])
+                st.dataframe(table1)
+            except Exception as e:
+                st.error(f"Error displaying Merged Table from PDF 1: {e}")
+        else:
+            st.warning("No valid table in PDF 1.")
+
+    with col2:
+        st.write("**Merged Table from PDF 2**")
+        if not tables2[0].empty:
+            try:
+                table2 = clean_table(tables2[0])
+                st.dataframe(table2)
+            except Exception as e:
+                st.error(f"Error displaying Merged Table from PDF 2: {e}")
+        else:
+            st.warning("No valid table in PDF 2.")
+
+    # Compare tables
+    st.subheader("Detailed Comparison Results")
+    differences = compare_tables(tables1, tables2)
+
+    if differences:
+        for diff in differences:
+            st.write(f"Table {diff['Table Index'] + 1} Differences")
+            if isinstance(diff['Differences'], str):
+                st.write(diff['Differences'])
+            else:
+                st.dataframe(diff['Differences'])
+    else:
+        st.success("No differences found!")
