@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # Path to the master file
 MASTER_FILE = "tsar2choice.xlsx"  # Ensure the file is in the same directory as this script.
 
-def display_comparison():
+def tsa_comparison():
     st.title("Order Comparison Dashboard")
 
     # Verify if the master file exists in the folder
@@ -273,4 +273,4 @@ def split_ranges(lst):
     return ", ".join(ranges)
 
 # Run the app
-display_comparison()
+tsa_comparison()
