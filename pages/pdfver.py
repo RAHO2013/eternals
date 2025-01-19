@@ -2,16 +2,17 @@ import streamlit as st
 import pandas as pd
 import pdfplumber
 
-# Function to extract table data from the PDF
-def extract_table_from_pdf(file):
-    table_data = []
+# Function to extract and consolidate table data from the PDF
+def extract_and_consolidate_tables(file):
+    consolidated_data = []
     with pdfplumber.open(file) as pdf:
         for page in pdf.pages:
             tables = page.extract_tables()
             for table in tables:
-                for row in table:
-                    table_data.append(row)
-    return table_data
+                if table:
+                    for row in table:
+                        consolidated_data.append(row)
+    return consolidated_data
 
 # Streamlit app
 st.title("PDF Table Extractor and Unique Value Counter")
@@ -20,7 +21,7 @@ uploaded_file = st.file_uploader("Upload a PDF file", type="pdf")
 
 if uploaded_file:
     st.write("### Extracting table data...")
-    table_data = extract_table_from_pdf(uploaded_file)
+    table_data = extract_and_consolidate_tables(uploaded_file)
 
     if table_data:
         # Ensure consistent row length with header
@@ -28,9 +29,9 @@ if uploaded_file:
         consistent_data = [row for row in table_data[1:] if len(row) == len(header)]
 
         if consistent_data:
-            # Convert table data into a DataFrame
+            # Convert consolidated table data into a DataFrame
             df = pd.DataFrame(consistent_data, columns=header)
-            st.write("### Extracted Table:")
+            st.write("### Consolidated Table:")
             st.dataframe(df)
 
             # Column selection for unique value count
