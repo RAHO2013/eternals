@@ -23,17 +23,24 @@ if uploaded_file:
     table_data = extract_table_from_pdf(uploaded_file)
 
     if table_data:
-        # Convert table data into a DataFrame
-        df = pd.DataFrame(table_data[1:], columns=table_data[0])  # Assuming the first row is the header
-        st.write("### Extracted Table:")
-        st.dataframe(df)
+        # Ensure consistent row length with header
+        header = table_data[0]  # Assuming the first row is the header
+        consistent_data = [row for row in table_data[1:] if len(row) == len(header)]
 
-        # Column selection for unique value count
-        column = st.selectbox("Select a column to count unique values:", df.columns)
+        if consistent_data:
+            # Convert table data into a DataFrame
+            df = pd.DataFrame(consistent_data, columns=header)
+            st.write("### Extracted Table:")
+            st.dataframe(df)
 
-        if column:
-            unique_values_count = df[column].value_counts()
-            st.write(f"### Unique Values in Column: {column}")
-            st.write(unique_values_count)
+            # Column selection for unique value count
+            column = st.selectbox("Select a column to count unique values:", df.columns)
+
+            if column:
+                unique_values_count = df[column].value_counts()
+                st.write(f"### Unique Values in Column: {column}")
+                st.write(unique_values_count)
+        else:
+            st.write("No consistent table data found in the PDF.")
     else:
         st.write("No table data found in the PDF.")
