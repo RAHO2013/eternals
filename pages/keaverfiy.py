@@ -9,8 +9,10 @@ def extract_pdf_data(uploaded_pdf):
         for page in pdf.pages:
             table = page.extract_table()
             if table:
-                # Skip the header row and append the rest
-                data_rows.extend(table[1:])
+                # Process each row and ensure correct column count
+                for row in table[1:]:  # Skip the header
+                    if len(row) == 6:  # Only include rows with exactly 6 columns
+                        data_rows.append(row)
 
     if data_rows:
         # Define columns based on the structure of the PDF
