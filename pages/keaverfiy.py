@@ -13,7 +13,7 @@ def extract_pdf_data(uploaded_pdf):
                 data_rows.extend(table[1:])
 
     if data_rows:
-        # Define columns based on the structure of your PDF
+        # Define columns based on the structure of the PDF
         columns = ["Optn. No", "College Code", "Course Code", "Course Name", 
                    "Course Fee per Annum (Rs)", "College Name"]
         return pd.DataFrame(data_rows, columns=columns)
