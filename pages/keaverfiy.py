@@ -1,25 +1,35 @@
 import streamlit as st
 import pandas as pd
-import pdfplumber
+import camelot
 
 def extract_pdf_data(uploaded_pdf):
-    """Extract tabular data from the uploaded PDF file using pdfplumber."""
-    with pdfplumber.open(uploaded_pdf) as pdf:
-        data_rows = []
-        for page in pdf.pages:
-            table = page.extract_table()
-            if table:
-                # Process each row and ensure correct column count
-                for row in table[1:]:  # Skip the header
-                    if len(row) == 6:  # Only include rows with exactly 6 columns
-                        data_rows.append(row)
-
-    if data_rows:
-        # Define columns based on the structure of the PDF
-        columns = ["Optn. No", "College Code", "Course Code", "Course Name", 
-                   "Course Fee per Annum (Rs)", "College Name"]
-        return pd.DataFrame(data_rows, columns=columns)
-    else:
+    """Extract tabular data from the uploaded PDF file using Camelot."""
+    try:
+        # Save the uploaded file to a temporary location
+        with open("temp.pdf", "wb") as f:
+            f.write(uploaded_pdf.read())
+        
+        # Extract tables using Camelot
+        tables = camelot.read_pdf("temp.pdf", pages="all", flavor="stream")
+        
+        if len(tables) == 0:
+            return None
+        
+        # Concatenate all extracted tables into a single DataFrame
+        data_frames = [table.df for table in tables]
+        combined_df = pd.concat(data_frames, ignore_index=True)
+        
+        # Rename columns based on your PDF's structure
+        if len(combined_df.columns) >= 6:
+            combined_df.columns = ["Optn. No", "College Code", "Course Code", 
+                                   "Course Name", "Course Fee per Annum (Rs)", 
+                                   "College Name"]
+            return combined_df
+        else:
+            st.warning("Extracted table has fewer columns than expected.")
+            return combined_df
+    except Exception as e:
+        st.error(f"An error occurred while extracting tables: {e}")
         return None
 
 def display_data_table(data):
@@ -47,7 +57,7 @@ def generate_summary(data):
         st.table(college_summary)
 
 def main():
-    st.title("PDF Table Extraction Tool")
+    st.title("PDF Table Extraction Tool with Camelot")
     st.write("Upload a PDF file to extract tabular data.")
     
     uploaded_pdf = st.file_uploader("Upload PDF File", type=["pdf"])
@@ -64,7 +74,7 @@ def main():
             generate_summary(extracted_data)
             
         except Exception as e:
-            st.error(f"An error occurred while processing the PDF: {e}")
+            st.error(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     main()
