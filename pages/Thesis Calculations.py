@@ -53,12 +53,20 @@ def apply_manual_ranges(value, ranges):
     return "Other"  # Catch-all for values outside specified ranges
 
 
-# Upload data
+# Upload data with error handling for invalid files
 st.title("Eternals Thesis")
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
 if uploaded_file:
-    df = pd.read_excel(uploaded_file)
+    try:
+        # Show progress bar while reading the file
+        with st.spinner("Reading Excel file..."):
+            df = pd.read_excel(uploaded_file)
+        st.success("File uploaded successfully!")
+    except Exception as e:
+        st.error(f"An error occurred while reading the file: {e}")
+        st.stop()
+
     export_content = []
 
     # Tab structure
